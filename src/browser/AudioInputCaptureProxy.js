@@ -93,7 +93,7 @@ function start(success, error, opts) {
     channels = opts[2] || channels;
     format = opts[3] || format;
     audioSourceType = opts[4] || audioSourceType;
-    fileUrl = opts[5] || fileUrl;
+    fileUrl = opts[5] || fileUrl || '';
     // the URL must be converted to a cdvfile:... URL to ensure it's readable from the outside
     fileUrl = fileUrl.replace("filesystem:file:///", "cdvfile://localhost/");
     console.log("AudioInputCaptureProxy: start - fileUrl: " + fileUrl);
@@ -225,28 +225,32 @@ function gotBuffers(wav) {
 }
 
 function doneEncoding(blob) {
-    console.log("AudioInputCaptureProxy: doneEncoding - write to: " + fileUrl);
-    var fileName = fileUrl.replace(/.*\//, "");
-    console.log("AudioInputCaptureProxy: doneEncoding - write to file: " + fileName);
-    fileSystem.root.getFile(fileName, {create: true}, function (fileEntry) {
-        fileEntry.createWriter(function (fileWriter) {
-            fileWriter.onwriteend = function (e) {
-                onStopped(fileUrl);
-            };
-            fileWriter.onerror = function (e) {
-                console.log("AudioInputCaptureProxy: " + fileUrl + " failed");
+    if(fileUrl != ''){
+        console.log("AudioInputCaptureProxy: doneEncoding - write to: " + fileUrl);
+        var fileName = fileUrl.replace(/.*\//, "");
+        console.log("AudioInputCaptureProxy: doneEncoding - write to file: " + fileName);
+        fileSystem.root.getFile(fileName, {create: true}, function (fileEntry) {
+            fileEntry.createWriter(function (fileWriter) {
+                fileWriter.onwriteend = function (e) {
+                    onStopped(fileUrl);
+                };
+                fileWriter.onerror = function (e) {
+                    console.log("AudioInputCaptureProxy: " + fileUrl + " failed");
+                    onStopError(e);
+                };
+                console.log("AudioInputCaptureProxy: Saving " + fileUrl);
+                fileWriter.write(blob);
+            }, function (e) {
+                console.log("AudioInputCaptureProxy: Could not create writer for " + fileUrl);
                 onStopError(e);
-            };
-            console.log("AudioInputCaptureProxy: Saving " + fileUrl);
-            fileWriter.write(blob);
+            }); // createWriter .wav
         }, function (e) {
-            console.log("AudioInputCaptureProxy: Could not create writer for " + fileUrl);
+            console.log("AudioInputCaptureProxy: Could not get " + fileUrl + " -  " + e.toString());
             onStopError(e);
-        }); // createWriter .wav
-    }, function (e) {
-        console.log("AudioInputCaptureProxy: Could not get " + fileUrl + " -  " + e.toString());
-        onStopError(e);
-    }); // getFile .wav
+        }); // getFile .wav
+    } else {
+        onStopped(blob);
+    }    
 }
 
 // 2015-01-28 robert@fromont.net.nz Adding a unique query string ensures it's loaded
